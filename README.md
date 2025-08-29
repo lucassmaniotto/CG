@@ -3,3 +3,4 @@ Repositório destinado aos estudos e trabalhos da disciplina de Computação Gr�
 
 ## Dependências:
 - Three JS: https://threejs.org/
+- Live Server (VS Code): https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer
