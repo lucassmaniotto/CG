@@ -102,7 +102,7 @@ var criaSer = function () {
   cotoveloDir.add(pivoCotoveloDir);
   let antebracoDir = new THREE.Mesh(new THREE.BoxGeometry(2, 8, 2), material);
   pivoCotoveloDir.add(antebracoDir);
-  antebracoDir.position.y -= 5;
+  antebracoDir.position.y -= 4;
   objects["pivoCotoveloDir"] = pivoCotoveloDir;
   objects["antebracoDir"] = antebracoDir;
 
