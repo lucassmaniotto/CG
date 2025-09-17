@@ -6,6 +6,9 @@ let objects = [];
 
 let velCubo = 0.001;
 
+// Variável de controle de movimento
+var move = { up: false, left: false, right: false };
+
 var criaSer = function () {
   // Materiais e geometrias
   const geometry = new THREE.BoxGeometry(2, 10, 2);
@@ -191,44 +194,19 @@ export function init() {
 
   renderer.render(scene, camera);
 
-  document.addEventListener("keydown", onKeyDown);
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "ArrowUp") move.up = true;
+    if (e.code === "ArrowLeft") move.left = true;
+    if (e.code === "ArrowRight") move.right = true;
+  });
+  document.addEventListener("keyup", function (e) {
+    if (e.code === "ArrowUp") move.up = false;
+    if (e.code === "ArrowLeft") move.left = false;
+    if (e.code === "ArrowRight") move.right = false;
+  });
 
   window.addEventListener("resize", onWindowResize);
 }
-
-var velOmbro = 0.01;
-
-var onKeyDown = function (e) {
-  console.log(e.keyCode);
-
-  if (e.keyCode == 187) {
-    // +
-    objects["ombroEsq"].scale.x += 0.01;
-    objects["ombroEsq"].scale.y += 0.01;
-    objects["ombroEsq"].scale.z += 0.01;
-  }
-
-  if (e.keyCode == 189) {
-    //-
-    objects["bracoEsq"].scale.x -= 0.01;
-    objects["bracoEsq"].scale.y -= 0.01;
-    objects["bracoEsq"].scale.z -= 0.01;
-  }
-
-  if (e.keyCode == 82) {
-    //R
-    objects["pivoOmbroEsq"].rotation.x -= velOmbro;
-    console.log(objects["pivoOmbroEsq"].rotation.x);
-    if (
-      objects["pivoOmbroEsq"].rotation.x < -1.62 ||
-      objects["pivoOmbroEsq"].rotation.x > 0.9
-    )
-      velOmbro *= -1;
-  }
-  if (e.keyCode == 32)
-    // space
-    velCubo = velCubo == 0 ? 0.001 : 0;
-};
 
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -236,20 +214,6 @@ function onWindowResize() {
 
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
-
-// --- Controle de movimento ---
-let move = { up: false, left: false, right: false };
-
-document.addEventListener("keydown", function (e) {
-  if (e.code === "ArrowUp") move.up = true;
-  if (e.code === "ArrowLeft") move.left = true;
-  if (e.code === "ArrowRight") move.right = true;
-});
-document.addEventListener("keyup", function (e) {
-  if (e.code === "ArrowUp") move.up = false;
-  if (e.code === "ArrowLeft") move.left = false;
-  if (e.code === "ArrowRight") move.right = false;
-});
 
 var nossaAnimacao = function () {
   let rotSpeed = 0.03;
