@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<style>
+			html, body {
+				width: 100vw;
+				height: 100vh;
+				margin: 0;
+				padding: 0;
+				overflow: hidden;
+				background: #000;
+			}
+			canvas {
+				display: block;
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100vw;
+				height: 100vh;
+			}
+		</style>
+		<title>Fourth Example</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	</head>
+	<body>
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "./js/three/three.module.js",
+					"three/addons/": "./js/jsm/",
+					"main" : "./js/ex4.js"
+				}
+			}
+		</script>
+
+		<script type="module">
+			import * as THREE from 'three';
+			import { init } from 'main';
+			
+			init(THREE);
+		</script>
+	</body>
+</html>
