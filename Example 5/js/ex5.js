@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GUI } from "three/addons/libs/lil-gui.module.min.js";
 import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { MTLLoader } from "three/addons/loaders/MTLLoader.js";
 
 let parametrosGUI;
 let camera, scene, renderer;
@@ -69,7 +70,7 @@ var updateScaleController = function(objectKey) {
 };
 
 // Define quais objetos foram rotacionados inicialmente no eixo X
-const rotatedObjects = ['horse', 'monkey', 'cat'];
+const rotatedObjects = ["horse", "monkey", "cat"];
 
 var createGUI = function () {
   const gui = new GUI();
@@ -168,79 +169,53 @@ var createGUI = function () {
       selectedObj.position.y = value;
     }
   });
-
-  
 };
 
-var loadObj = function (objName, fileName, position = { x: 0, y: -5, z: 0 }, scale = 20, rotation = { x: 0, y: 0, z: 0 }) {
-  let objLoader = new OBJLoader();
+var loadObj = function (objName, fileName, position = { x: 0, y: -5, z: 0 }, scale = 20, rotation = { x: 0, y: 0, z: 0 }
+) {
+  const objPath = `./assets/models/${objName}/${fileName}`;
+  const mtlPath = `./assets/models/${objName}/${objName}_mtl.mtl`;
 
-  objLoader.load(
-    `./assets/models/${objName}/${fileName}`,
-    function (object) {
-      console.log(`${objName} carregado com sucesso!`);
-      object.traverse(function (child) {
-        if (child instanceof THREE.Mesh) {
-          // Cria um material padrão e tenta carregar uma textura JPG correspondente ao objeto
-          const baseMaterial = new THREE.MeshStandardMaterial({
-            color: 0xaaaaaa,
-            roughness: 0.7,
-            metalness: 0.0,
-            side: THREE.DoubleSide
-          });
-          child.material = baseMaterial;
+  const objLoader = new OBJLoader();
+  const mtlLoader = new MTLLoader();
 
-          // Tentativas de caminho: lowercase (padrão) e o nome original
-          const nameLower = objName.toLowerCase();
-          const candidatePaths = [
-            `./assets/models/${objName}/textures/${nameLower}.jpg`,
-            `./assets/models/${objName}/textures/${objName}.jpg`
-          ];
+  // Carrega o arquivo MTL primeiro
+  mtlLoader.load(
+    mtlPath,
+    // Callback quando o MTL é carregado
+    function (materialsCreator) {
+      // Aplica os materiais ao OBJLoader
+      materialsCreator.preload();
+      objLoader.setMaterials(materialsCreator);
 
-          // Função recursiva para tentar os caminhos em sequência
-          const tryLoad = (index) => {
-            if (index >= candidatePaths.length) {
-              console.warn(`Nenhuma textura encontrada para ${objName}. Usando material padrão.`);
-              return;
-            }
-            const path = candidatePaths[index];
-            textureLoader.load(
-              path,
-              function (texture) {
-                // Ajustes de cor para JPEGs
-                if (texture) {
-                  try { texture.encoding = THREE.sRGBEncoding; } catch (e) {}
-                }
-                baseMaterial.map = texture;
-                baseMaterial.needsUpdate = true;
-                console.log(`Textura aplicada: ${path} -> ${objName}`);
-              },
-              undefined,
-              function (err) {
-                // Não encontrou, tenta próximo caminho
-                console.warn(`Não encontrou textura em ${path}, tentando próximo...`);
-                tryLoad(index + 1);
-              }
+      objLoader.load(
+        objPath,
+        // Callback quando o OBJ é carregado
+        function (object) {
+          console.log(`${objName} carregado com materiais do MTL!`);
+          object.scale.set(scale, scale, scale);
+          object.position.set(position.x, position.y, position.z);
+          object.rotation.set(rotation.x, rotation.y, rotation.z);
+          scene.add(object);
+          objects[objName.toLowerCase()] = object;
+        },
+        function (progress) {
+          if (progress && progress.loaded && progress.total)
+            console.log(
+              objName +
+                " " +
+                (progress.loaded / progress.total) * 100 +
+                "% loaded"
             );
-          };
-          tryLoad(0);
+        },
+        function (error) {
+          console.error(`Erro ao carregar o ${objName} (com MTL):`, error);
+          console.log(`Verifique se o arquivo existe em: ${objPath}`);
         }
-      });
-      object.scale.set(scale, scale, scale);
-      object.position.set(position.x, position.y, position.z);
-      object.rotation.set(rotation.x, rotation.y, rotation.z);
-      scene.add(object);
-      objects[objName.toLowerCase()] = object;
-    },
-    function (progress) {
-      console.log(objName + " " + (progress.loaded / progress.total) * 100 + "% loaded");
-    },
-    function (error) {
-      console.error(`Erro ao carregar o ${objName}:`, error);
-      console.log(`Verifique se o arquivo existe em: ./assets/${fileName}`);
+      );
     }
-  )
-}
+  );
+};
 
 var loadAllObjects = function () {
   // Carrega todos os objetos usando as configurações definidas em objectConfigs
