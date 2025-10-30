@@ -182,10 +182,18 @@ var loadObj = function (objName, fileName, position = { x: 0, y: -5, z: 0 }, sca
   // Carrega o arquivo MTL primeiro
   mtlLoader.load(
     mtlPath,
-    // Callback quando o MTL é carregado
     function (materialsCreator) {
-      // Aplica os materiais ao OBJLoader
+      // Define caminho de texturas
+      try {
+        if (materialsCreator.setTexturePath)
+          materialsCreator.setTexturePath(
+            `./assets/models/${objName}/textures/`
+          );
+      } catch (e) {}
+      // Prepara os materiais
       materialsCreator.preload();
+
+      // Aplica os materiais ao OBJLoader
       objLoader.setMaterials(materialsCreator);
 
       objLoader.load(
