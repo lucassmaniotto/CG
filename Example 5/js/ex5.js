@@ -69,7 +69,7 @@ var updateScaleController = function(objectKey) {
 };
 
 // Define quais objetos foram rotacionados inicialmente no eixo X
-const rotatedObjects = ['horse', 'monkey', 'pig'];
+const rotatedObjects = ['horse', 'monkey', 'cat'];
 
 var createGUI = function () {
   const gui = new GUI();
@@ -176,7 +176,7 @@ var loadObj = function (objName, fileName, position = { x: 0, y: -5, z: 0 }, sca
   let objLoader = new OBJLoader();
 
   objLoader.load(
-    `./assets/${fileName}`,
+    `./assets/models/${objName}/${fileName}`,
     function (object) {
       console.log(`${objName} carregado com sucesso!`);
       object.traverse(function (child) {
@@ -193,8 +193,8 @@ var loadObj = function (objName, fileName, position = { x: 0, y: -5, z: 0 }, sca
           // Tentativas de caminho: lowercase (padrão) e o nome original
           const nameLower = objName.toLowerCase();
           const candidatePaths = [
-            `./assets/textures/${nameLower}/${nameLower}.jpg`,
-            `./assets/textures/${objName}/${objName}.jpg`
+            `./assets/models/${objName}/textures/${nameLower}.jpg`,
+            `./assets/models/${objName}/textures/${objName}.jpg`
           ];
 
           // Função recursiva para tentar os caminhos em sequência
@@ -290,7 +290,7 @@ export function init() {
   directionalLight.castShadow = true;
   scene.add(directionalLight);
 
-  const grassPath = './assets/textures/grass.jpg';
+  const grassPath = './assets/grass.jpg';
   const grassTexture = textureLoader.load(
     grassPath,
     function (tex) {
