@@ -27,5 +27,5 @@ Seta para Direita: move para a direita
 ### Controles especiais
 ````
 Espaço: Faz o dragão voar (altera a posição Y)
-Crtl esquerdo: Faz o dragão descer (altera a posição Y, limite mínimo Y=0)
+Ctrl esquerdo: Faz o dragão descer (altera a posição Y, limite mínimo Y=0)
 ````
