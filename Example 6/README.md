@@ -17,12 +17,15 @@
 ### Controles de movimento
 - Cada tecla altera a posição X do dragão:
 
-    Seta para Frente: move para frente
-    Seta para Trás: move para trás
-    Seta para Esquerda: move para a esquerda
-    Seta para Direita: move para a direita
-
+````
+Seta para Frente: move para frente
+Seta para Trás: move para trás
+Seta para Esquerda: move para a esquerda
+Seta para Direita: move para a direita
+````
 
 ### Controles especiais
+````
 Espaço: Faz o dragão voar (altera a posição Y)
 Crtl esquerdo: Faz o dragão descer (altera a posição Y, limite mínimo Y=0)
+````
