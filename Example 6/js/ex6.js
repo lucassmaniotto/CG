@@ -6,7 +6,6 @@ let parametrosGUI, camera, scene, renderer, objects = {};
 let cameraFollowTarget = null, followDistance = 50, followHeight = 30; // dist/altura da câmera
 let dirLight, pointLight, spotLight, dirHelper, pointHelper, spotHelper; // luzes GUI
 let mixer, activeAction, loadFinished = false;
-const animationActions = []; // legado; mantendo se precisar
 const actions = { idle: null, walk: null, fly: null }; // mapeamento de animações usadas
 const clock = new THREE.Clock();
 
@@ -63,9 +62,6 @@ const loadObj = (objName, fileName, position = { x: 0, y: -5, z: 0 }, scale, rot
         actions.idle = object.animations[2] ? mixer.clipAction(object.animations[2]) : null;
         actions.walk = object.animations[0] ? mixer.clipAction(object.animations[0]) : null;
         actions.fly  = object.animations[1] ? mixer.clipAction(object.animations[1]) : null;
-        if (actions.idle) animationActions.push(actions.idle);
-        if (actions.walk) animationActions.push(actions.walk);
-        if (actions.fly)  animationActions.push(actions.fly);
       } catch (e) {
         console.warn("Não foi possível configurar as animações walk/idle:", e);
       }
@@ -107,11 +103,13 @@ function createLightWithGui({ type, label, state, guiParent, intensityRange = [0
   const LIGHT_DEFS = {
     directional: {
       factory: () => new THREE.DirectionalLight(0xffffff, 0.6),
-      helperFactory: (light) => new THREE.DirectionalLightHelper(light, 5, 0x00ffcc),
+      helperFactory: (light) => new THREE.DirectionalLightHelper(light, 5, 0xff0000),
       afterCreate: (light) => { 
-        light.castShadow = true; 
-        const cameraShadow = light.shadow.camera; 
-        const SIZE = 40; 
+        light.castShadow = true;
+        const cameraShadow = light.shadow.camera; // câmera ortográfica da sombra 
+        
+        // Configura área da sombra
+        const SIZE = 400; 
         cameraShadow.left = -SIZE; 
         cameraShadow.right = SIZE; 
         cameraShadow.top = SIZE; 
@@ -124,12 +122,12 @@ function createLightWithGui({ type, label, state, guiParent, intensityRange = [0
     },
     point: {
       factory: () => new THREE.PointLight(0xffffff, 2, 0, 2),
-      helperFactory: (light) => new THREE.PointLightHelper(light, 2, 0xff00ff),
+      helperFactory: (light) => new THREE.PointLightHelper(light, 2, 0xffff00),
       afterCreate: (light) => { light.castShadow = true; },
     },
     spot: {
       factory: () => new THREE.SpotLight(0xffffff, 5, 0, 0.5, 0.2, 2),
-      helperFactory: (light) => new THREE.SpotLightHelper(light, 0x00ffff),
+      helperFactory: (light) => new THREE.SpotLightHelper(light, 0xff00ff),
       afterCreate: (light) => { 
         light.castShadow = true; 
         if (!light.target.parent) 
@@ -222,8 +220,8 @@ const createGUI = () => {
   parametrosGUI = {
     iluminacao: {
       directional: { enabled: true, color: "#ffffff", intensity: 0.5, helper: false, x: 10, y: 20, z: 10 },
-      point: { enabled: false, color: "#ffffff", intensity: 2.0, helper: false, x: -10, y: 15, z: 10 },
-      spot: { enabled: false, color: "#ffffff", intensity: 500.0, helper: false, x: -10, y: 25, z: 10, angle: 0.5 },
+      point: { enabled: false, color: "#ffffff", intensity: 50.0, helper: false, x: -10, y: 15, z: 10 },
+      spot: { enabled: false, color: "#ffffff", intensity: 1000.0, helper: false, x: -10, y: 25, z: 10, angle: 0.5 },
     },
   };
 
@@ -245,7 +243,7 @@ const createGUI = () => {
       label: "Point", 
       state: parametrosGUI.iluminacao.point, 
       guiParent: lightsFolder, 
-      intensityRange: [0, 50, 0.1] }
+      intensityRange: [0, 500, 0.1] }
     ); 
     pointLight = light; 
     pointHelper = helper; 
@@ -298,12 +296,15 @@ export function init() {
   scene.add(ground);
 
   renderer = new THREE.WebGLRenderer(); 
+  // Habilita sombras
   renderer.shadowMap.enabled = true; 
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
-  renderer.setSize(window.innerWidth, window.innerHeight); 
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;  // suavização para cobrir a sombra do dragão
+  renderer.setSize(window.innerWidth, window.innerHeight);  // seta o tamanho do renderizador
   try { renderer.outputEncoding = THREE.sRGBEncoding; } catch (e) {}
 
-  createGUI(); loadAllObjects();
+  createGUI(); 
+  loadAllObjects();
+
   camera.position.set(0, 0, 50); 
   camera.lookAt(0, 0, 0);
   document.body.appendChild(renderer.domElement);
@@ -371,7 +372,8 @@ function animate() {
   if (cameraFollowTarget) {
     try {
       const dir = new THREE.Vector3(); cameraFollowTarget.getWorldDirection(dir);
-      const desiredPos = cameraFollowTarget.position.clone().addScaledVector(dir, -followDistance); desiredPos.y = cameraFollowTarget.position.y + followHeight;
+      const desiredPos = cameraFollowTarget.position.clone().addScaledVector(dir, -followDistance); 
+      desiredPos.y = cameraFollowTarget.position.y + followHeight;
       camera.position.lerp(desiredPos, 0.12); camera.lookAt(cameraFollowTarget.position);
     } catch (e) { 
       console.warn("Erro ao atualizar a posição da câmera seguindo o alvo:", e);
