@@ -2,11 +2,18 @@ import * as THREE from "three";
 import { GUI } from "three/addons/libs/lil-gui.module.min.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 
-let parametrosGUI, camera, scene, renderer, objects = [];
+let parametrosGUI, camera, scene, renderer, objects = {};
 let cameraFollowTarget = null, followDistance = 50, followHeight = 40; // dist/altura da câmera
 let dirLight, pointLight, spotLight, dirHelper, pointHelper, spotHelper; // luzes GUI
-let mixer, activateAnimation, loadFinished = false; const animationActions = []; 
+let mixer, activeAction, loadFinished = false;
+const animationActions = []; // legado; mantendo se precisar
+const actions = { idle: null, walk: null }; // mapeamento de animações usadas
 const clock = new THREE.Clock();
+
+// Estado de entrada (setas) e movimento
+const input = { forward: false, back: false, left: false, right: false };
+const moveSpeed = 50; // unidades/segundo (ajuste conforme necessário)
+const rotationSpeed = Math.PI / 2; // rad/seg (180°/s)
 
 // Loader de textura
 const textureLoader = new THREE.TextureLoader();
@@ -50,11 +57,20 @@ const loadObj = (objName, fileName, position = { x: 0, y: -5, z: 0 }, scale, rot
       */
 
       mixer = new THREE.AnimationMixer(object);
-      const animation = mixer.clipAction(object.animations[2]); // idle
-      animationActions.push(animation); 
-      activateAnimation = animation; 
-      loadFinished = true; 
-      activateAnimation.play();
+      // Cria as ações principais
+      try {
+        actions.idle = object.animations[2] ? mixer.clipAction(object.animations[2]) : null;
+        actions.walk = object.animations[0] ? mixer.clipAction(object.animations[0]) : null;
+        if (actions.idle) animationActions.push(actions.idle);
+        if (actions.walk) animationActions.push(actions.walk);
+      } catch (e) {
+        console.warn("Não foi possível configurar as animações walk/idle:", e);
+      }
+
+      // Define animação ativa como idle
+      activeAction = actions.idle || (object.animations[0] ? mixer.clipAction(object.animations[0]) : null);
+      if (activeAction) activeAction.play();
+      loadFinished = true;
 
       // Faz a câmera seguir o dragão (atrás e acima)
       if (objName.toLowerCase() === "dragon") {
@@ -84,21 +100,22 @@ const loadObj = (objName, fileName, position = { x: 0, y: -5, z: 0 }, scale, rot
 
 // Cria luz + helper + controles GUI
 function createLightWithGui({ type, label, state, guiParent, intensityRange = [0, 5, 0.1] }) {
+  // Definições de luzes
   const LIGHT_DEFS = {
     directional: {
       factory: () => new THREE.DirectionalLight(0xffffff, 0.6),
       helperFactory: (light) => new THREE.DirectionalLightHelper(light, 5, 0x00ffcc),
       afterCreate: (light) => { 
         light.castShadow = true; 
-        const camera = light.shadow.camera; 
+        const cameraShadow = light.shadow.camera; 
         const SIZE = 40; 
-        camera.left = -SIZE; 
-        camera.right = SIZE; 
-        camera.top = SIZE; 
-        camera.bottom = -SIZE; 
-        camera.near = 0.5; 
-        camera.far = 500; 
-        camera.updateProjectionMatrix(); 
+        cameraShadow.left = -SIZE; 
+        cameraShadow.right = SIZE; 
+        cameraShadow.top = SIZE; 
+        cameraShadow.bottom = -SIZE; 
+        cameraShadow.near = 0.5; 
+        cameraShadow.far = 500; 
+        cameraShadow.updateProjectionMatrix(); 
         light.shadow.mapSize.set(2048, 2048); 
       },
     },
@@ -119,6 +136,7 @@ function createLightWithGui({ type, label, state, guiParent, intensityRange = [0
     },
   };
 
+  // Cria luzes
   const def = LIGHT_DEFS[type]; 
   if (!def) throw new Error(`Tipo de luz desconhecido: ${type}`);
   const light = def.factory(); 
@@ -205,6 +223,7 @@ const createGUI = () => {
   };
 
   const lightsFolder = gui.addFolder("Iluminação"); lightsFolder.open();
+  // Cria luzes com GUI
   { 
     const { light, helper } = createLightWithGui({ 
       type: "directional", 
@@ -285,11 +304,51 @@ export function init() {
   document.body.appendChild(renderer.domElement);
   renderer.setAnimationLoop(animate); // loop de animação
   window.addEventListener("resize", onWindowResize);
+
+  // Controles de teclado (setas)
+  window.addEventListener("keydown", onKeyDown, { passive: false });
+  window.addEventListener("keyup", onKeyUp, { passive: false });
 }
 
 function animate() {
   const delta = clock.getDelta();
-  if (loadFinished) { mixer.update(delta); activateAnimation.play(); }
+  if (loadFinished && mixer) { mixer.update(delta); }
+
+  // Movimento do Dragão
+  const dragon = objects["dragon"];
+  if (dragon) {
+    // Rotação em Y com setas esquerda/direita
+    const turnDir = (input.left ? 1 : 0) + (input.right ? -1 : 0); // esquerda positivo, direita negativo
+    if (turnDir !== 0) {
+      dragon.rotation.y += turnDir * rotationSpeed * delta;
+    }
+
+    // Apenas translação conta como andar
+    const anyMoving = input.forward || input.back;
+
+    // Atualiza animação com base no estado de movimento
+    if (anyMoving && actions.walk) {
+      if (activeAction !== actions.walk) switchAction(actions.walk, 0.2);
+    } else if (!anyMoving && actions.idle) {
+      if (activeAction !== actions.idle) switchAction(actions.idle, 0.2);
+    }
+
+    if (anyMoving) {
+      // Direção "frente" após rotação (apenas no plano XZ)
+      const forward = new THREE.Vector3();
+      dragon.getWorldDirection(forward);
+      forward.y = 0; // manter no plano do chão
+      if (forward.lengthSq() > 0) forward.normalize();
+
+      const move = new THREE.Vector3();
+      if (input.forward) move.add(forward);
+      if (input.back) move.addScaledVector(forward, -1);
+      if (move.lengthSq() > 0) {
+        move.normalize();
+        dragon.position.addScaledVector(move, moveSpeed * delta);
+      }
+    }
+  }
 
   // Segue o alvo (ex: Dragon)
   if (cameraFollowTarget) {
@@ -310,4 +369,38 @@ function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight; 
   camera.updateProjectionMatrix(); 
   renderer.setSize(window.innerWidth, window.innerHeight); 
+}
+
+// Alterna animações com crossfade
+function switchAction(nextAction, duration = 0.2) {
+  if (!nextAction) return;
+  if (activeAction === nextAction) return;
+  nextAction.reset().play();
+  if (activeAction) activeAction.crossFadeTo(nextAction, duration, false);
+  activeAction = nextAction;
+}
+
+// Handlers de teclado
+function onKeyDown(e) {
+  if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "ArrowLeft" || e.code === "ArrowRight") {
+    e.preventDefault();
+  }
+  switch (e.code) {
+    case "ArrowUp": input.forward = true; break;
+    case "ArrowDown": input.back = true; break;
+    case "ArrowLeft": input.left = true; break;
+    case "ArrowRight": input.right = true; break;
+  }
+}
+
+function onKeyUp(e) {
+  if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "ArrowLeft" || e.code === "ArrowRight") {
+    e.preventDefault();
+  }
+  switch (e.code) {
+    case "ArrowUp": input.forward = false; break;
+    case "ArrowDown": input.back = false; break;
+    case "ArrowLeft": input.left = false; break;
+    case "ArrowRight": input.right = false; break;
+  }
 }
