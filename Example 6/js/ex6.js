@@ -3,17 +3,18 @@ import { GUI } from "three/addons/libs/lil-gui.module.min.js";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 
 let parametrosGUI, camera, scene, renderer, objects = {};
-let cameraFollowTarget = null, followDistance = 50, followHeight = 40; // dist/altura da câmera
+let cameraFollowTarget = null, followDistance = 50, followHeight = 30; // dist/altura da câmera
 let dirLight, pointLight, spotLight, dirHelper, pointHelper, spotHelper; // luzes GUI
 let mixer, activeAction, loadFinished = false;
 const animationActions = []; // legado; mantendo se precisar
-const actions = { idle: null, walk: null }; // mapeamento de animações usadas
+const actions = { idle: null, walk: null, fly: null }; // mapeamento de animações usadas
 const clock = new THREE.Clock();
 
 // Estado de entrada (setas) e movimento
-const input = { forward: false, back: false, left: false, right: false };
-const moveSpeed = 50; // unidades/segundo (ajuste conforme necessário)
-const rotationSpeed = Math.PI / 2; // rad/seg (180°/s)
+const input = { forward: false, back: false, left: false, right: false, ascend: false, descend: false };
+const moveSpeed = 50; // unidades/segundo
+const rotationSpeed = Math.PI / 2; // radianos/segundo (90°/s)
+const verticalSpeed = 25; // unidades/segundo (subida/descida)
 
 // Loader de textura
 const textureLoader = new THREE.TextureLoader();
@@ -61,8 +62,10 @@ const loadObj = (objName, fileName, position = { x: 0, y: -5, z: 0 }, scale, rot
       try {
         actions.idle = object.animations[2] ? mixer.clipAction(object.animations[2]) : null;
         actions.walk = object.animations[0] ? mixer.clipAction(object.animations[0]) : null;
+        actions.fly  = object.animations[1] ? mixer.clipAction(object.animations[1]) : null;
         if (actions.idle) animationActions.push(actions.idle);
         if (actions.walk) animationActions.push(actions.walk);
+        if (actions.fly)  animationActions.push(actions.fly);
       } catch (e) {
         console.warn("Não foi possível configurar as animações walk/idle:", e);
       }
@@ -159,11 +162,13 @@ function createLightWithGui({ type, label, state, guiParent, intensityRange = [0
     console.warn(`Não foi possível criar helper para ${label}:`, e); 
   }
 
-  const f = guiParent.addFolder(label); state.enabled ? f.open() : f.close();
+  const folder = guiParent.addFolder(label); state.enabled ? folder.open() : folder.close();
   let helperController; // referência ao checkbox do helper
 
-  f.add(state, "enabled").name("Ativar").onChange((visible) => {
-    light.visible = visible; visible ? f.open() : f.close();
+  folder.add(state, "enabled").name("Ativar").onChange((visible) => {
+    light.visible = visible; 
+    // Quando a luz é desativada força collapse do folder da GUI
+    visible ? folder.open() : folder.close();
     if (!visible && state.helper) { // desliga helper ao desativar luz
       if (helperController && typeof helperController.setValue === "function") 
         helperController.setValue(false); 
@@ -174,12 +179,12 @@ function createLightWithGui({ type, label, state, guiParent, intensityRange = [0
     }
   });
 
-  f.addColor(state, "color").name("Cor").onChange((color) => { light.color.set(color); });
+  folder.addColor(state, "color").name("Cor").onChange((color) => { light.color.set(color); });
 
   const [iMin, iMax, iStep] = intensityRange;
-  f.add(state, "intensity", iMin, iMax, iStep).name("Intensidade").onChange((visible) => { light.intensity = visible; });
+  folder.add(state, "intensity", iMin, iMax, iStep).name("Intensidade").onChange((visible) => { light.intensity = visible; });
 
-  helperController = f.add(state, "helper").name("Helper").onChange((visible) => { 
+  helperController = folder.add(state, "helper").name("Helper").onChange((visible) => { 
     if (helper) { 
       helper.visible = visible; 
       if (type === "spot" && helper.update) 
@@ -192,23 +197,23 @@ function createLightWithGui({ type, label, state, guiParent, intensityRange = [0
     if (helper && helper.update) helper.update(); 
   };
 
-  f.add(state, "x", -200, 200, 1).name("Pos X").onChange((x) => { 
+  folder.add(state, "x", -200, 200, 1).name("Pos X").onChange((x) => { 
     light.position.x = x; updateHelper(); 
   });
-  f.add(state, "y", -200, 200, 1).name("Pos Y").onChange((y) => { 
+  folder.add(state, "y", -200, 200, 1).name("Pos Y").onChange((y) => { 
     light.position.y = y; updateHelper(); 
   });
-  f.add(state, "z", -200, 200, 1).name("Pos Z").onChange((z) => { 
+  folder.add(state, "z", -200, 200, 1).name("Pos Z").onChange((z) => { 
     light.position.z = z; updateHelper(); 
   });
 
   if (type === "spot") { 
     const HALF_PI = Math.PI / 2; 
-    f.add(state, "angle", 0.0, HALF_PI, 0.01).name("Ângulo").onChange((angle) => { 
+    folder.add(state, "angle", 0.0, HALF_PI, 0.01).name("Ângulo").onChange((angle) => { 
       light.angle = angle; updateHelper(); 
     }); 
   }
-  return { light, helper, folder: f };
+  return { light, helper, folder };
 }
 
 const createGUI = () => {
@@ -267,7 +272,7 @@ const loadAllObjects = () => {
 
 export function init() {
   camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
-  scene = new THREE.Scene(); scene.background = new THREE.Color(0x222222);
+  scene = new THREE.Scene(); scene.background = new THREE.Color(0x87CEEB);
   scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 
   const grassPath = "./assets/grass.jpg";
@@ -323,13 +328,25 @@ function animate() {
       dragon.rotation.y += turnDir * rotationSpeed * delta;
     }
 
+    // Movimento vertical (Espaço sobe, Ctrl Esquerdo desce)
+    if (input.ascend) {
+      dragon.position.y += verticalSpeed * delta;
+    }
+    if (input.descend) {
+      dragon.position.y -= verticalSpeed * delta;
+      if (dragon.position.y < 0) dragon.position.y = 0; // chão em y=0
+    }
+
     // Apenas translação conta como andar
     const anyMoving = input.forward || input.back;
 
-    // Atualiza animação com base no estado de movimento
-    if (anyMoving && actions.walk) {
+    // Atualiza animação com base no estado (prioridade: voar > andar > idle)
+    const isFlying = input.ascend || input.descend || dragon.position.y > 0.0;
+    if (isFlying && actions.fly) {
+      if (activeAction !== actions.fly) switchAction(actions.fly, 0.2);
+    } else if (anyMoving && actions.walk) {
       if (activeAction !== actions.walk) switchAction(actions.walk, 0.2);
-    } else if (!anyMoving && actions.idle) {
+    } else if (actions.idle) {
       if (activeAction !== actions.idle) switchAction(actions.idle, 0.2);
     }
 
@@ -350,7 +367,7 @@ function animate() {
     }
   }
 
-  // Segue o alvo (ex: Dragon)
+  // Segue o Dragon
   if (cameraFollowTarget) {
     try {
       const dir = new THREE.Vector3(); cameraFollowTarget.getWorldDirection(dir);
@@ -382,7 +399,13 @@ function switchAction(nextAction, duration = 0.2) {
 
 // Handlers de teclado
 function onKeyDown(e) {
-  if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "ArrowLeft" || e.code === "ArrowRight") {
+  if (
+    e.code === "ArrowUp" || 
+    e.code === "ArrowDown" || 
+    e.code === "ArrowLeft" || 
+    e.code === "ArrowRight" || 
+    e.code === "Space" || 
+    e.code === "ControlLeft") {
     e.preventDefault();
   }
   switch (e.code) {
@@ -390,11 +413,18 @@ function onKeyDown(e) {
     case "ArrowDown": input.back = true; break;
     case "ArrowLeft": input.left = true; break;
     case "ArrowRight": input.right = true; break;
+    case "Space": input.ascend = true; break;
+    case "ControlLeft": input.descend = true; break;
   }
 }
 
 function onKeyUp(e) {
-  if (e.code === "ArrowUp" || e.code === "ArrowDown" || e.code === "ArrowLeft" || e.code === "ArrowRight") {
+  if (e.code === "ArrowUp" || 
+    e.code === "ArrowDown" || 
+    e.code === "ArrowLeft" || 
+    e.code === "ArrowRight" || 
+    e.code === "Space" || 
+    e.code === "ControlLeft") {
     e.preventDefault();
   }
   switch (e.code) {
@@ -402,5 +432,7 @@ function onKeyUp(e) {
     case "ArrowDown": input.back = false; break;
     case "ArrowLeft": input.left = false; break;
     case "ArrowRight": input.right = false; break;
+    case "Space": input.ascend = false; break;
+    case "ControlLeft": input.descend = false; break;
   }
 }
